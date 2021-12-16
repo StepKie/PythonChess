@@ -24,7 +24,10 @@ stellung = [[]]
 
 
 def mache_zug(von, nach):
-    return 0
+    figur = stellung[von[1]][von[0]]
+    stellung[von[1]][von[0]] = "-"
+    stellung[nach[1]][nach[0]] = figur
+    zeichne_stellung()
 
 
 def feld_zu_koordinaten(spalte, zeile):
@@ -62,7 +65,7 @@ def zeichne_stellung():
     for zeile in range(len(stellung)):
         for spalte in range(len(stellung[0])):
             color = (WHITE, BLACK)[(spalte + zeile) % 2]
-            (y, x) = feld_zu_koordinaten(zeile, spalte)
+            (x, y) = feld_zu_koordinaten(spalte, zeile)
             pg.draw.rect(screen, color, [x, y, FELDBREITE, FELDHOEHE])
             if stellung[zeile][spalte] != '-':
                 screen.blit(bilder_der_figuren[stellung[zeile][spalte]], (x, y))
@@ -88,7 +91,14 @@ while weitermachen:
     for ereignis in pg.event.get():
         if ereignis.type == pg.MOUSEBUTTONDOWN:
             print('Die Maus wurde geklickt.')
-            print(pg.mouse.get_pos())
+            koordinate_von = pg.mouse.get_pos()
+            print(koordinate_von)
+        if ereignis.type == pg.MOUSEBUTTONUP:
+            print('Die Maus wurde losgelassen.')
+            koordinate_nach = pg.mouse.get_pos()
+            print(koordinate_nach)
+            mache_zug(koordinaten_zu_feld(*koordinate_von), koordinaten_zu_feld(*koordinate_nach))
+
         if ereignis.type == pg.QUIT:
             weitermachen = False
 
