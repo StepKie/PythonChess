@@ -8,7 +8,8 @@ FELDBREITE = BREITE // 8
 FELDHOEHE = HOEHE // 8
 
 WHITE = (240, 240, 240)
-BLACK = (100, 115, 15)
+BLACK = (160, 50, 50)
+GREEN = (100, 115, 15)
 
 STANDARDFIGUREN = [('r', 'br'), ('n', 'bn'), ('b', 'bb'), ('q', 'bq'), ('k', 'bk'), ('p', 'bp'),
                    ('R', 'wr'), ('N', 'wn'), ('B', 'wb'), ('Q', 'wq'), ('K', 'wk'), ('P', 'wp')]
@@ -25,6 +26,8 @@ stellung = [[]]
 
 def mache_zug(von, nach):
     figur = stellung[von[1]][von[0]]
+    if figur == "-":
+        return
     stellung[von[1]][von[0]] = "-"
     stellung[nach[1]][nach[0]] = figur
     zeichne_stellung()
@@ -45,6 +48,20 @@ def lade_figuren():
             pg.image.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Figuren', dateiname + '.png')),
             (FELDBREITE, FELDHOEHE))
     return bilder
+
+def zielfelder(von):
+    (startx, starty) = von
+    figur = stellung[starty][startx]
+    zielfelder = []
+    if figur == "R":
+        for zeile in range(8):
+            zielfelder.append((zeile, starty))
+        for spalte in range(8):
+            zielfelder.append((startx, spalte))
+    zielfelder.remove(von)
+    zielfelder.remove(von)
+    return zielfelder
+
 
 
 def erstelle_ausgangsstellung():
@@ -92,6 +109,11 @@ while weitermachen:
         if ereignis.type == pg.MOUSEBUTTONDOWN:
             print('Die Maus wurde geklickt.')
             koordinate_von = pg.mouse.get_pos()
+            dorthinkannmanziehen = zielfelder(koordinaten_zu_feld(*koordinate_von))
+            for feld in dorthinkannmanziehen:
+                (x, y) = feld_zu_koordinaten(*feld)
+                pg.draw.rect(screen, GREEN, [x, y, FELDBREITE, FELDHOEHE])
+            pg.display.flip()
             print(koordinate_von)
         if ereignis.type == pg.MOUSEBUTTONUP:
             print('Die Maus wurde losgelassen.')
