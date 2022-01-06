@@ -1,13 +1,13 @@
-import sys
-
 import pygame as pg
 import os
+import sys
 
 pg.init()
 BREITE = 800
 HOEHE = 800
 FELDBREITE = BREITE // 8
 FELDHOEHE = HOEHE // 8
+FPS = 40
 
 WHITE = pg.Color("white")
 BLACK = pg.Color("grey")
@@ -16,7 +16,6 @@ GREEN = pg.Color("darkgreen")
 STANDARDFIGUREN = [('r', 'br'), ('n', 'bn'), ('b', 'bb'), ('q', 'bq'), ('k', 'bk'), ('p', 'bp'),
                    ('R', 'wr'), ('N', 'wn'), ('B', 'wb'), ('Q', 'wq'), ('K', 'wk'), ('P', 'wp')]
 
-FPS = 40
 screen = pg.display.set_mode((BREITE, HOEHE))
 
 
@@ -26,7 +25,6 @@ def mache_zug(von, nach):
         return
     stellung[von[1]][von[0]] = "-"
     stellung[nach[1]][nach[0]] = figur
-    zeichne_stellung()
     return 'b' if am_zug == 'w' else 'w'
 
 
@@ -54,9 +52,12 @@ def ist_gegnerische_figur(figur):
 def ist_eigene_figur(figur):
     return (figur.islower() and am_zug == 'b') or (figur.isupper() and am_zug == 'w')
 
+
 # TODO Prüfe, ob entstehende Stellung legal ist -
 # (eigener König kann danach nicht "geschlagen" werden - d.h. im Schach oder Könige nebeneinander)
 def legale_zielfelder(von_feld):
+    if von_feld == ():
+        return []
     startlinie, startreihe = von_feld
     figur = stellung[startreihe][startlinie]
     if not ist_eigene_figur(figur):
@@ -191,24 +192,24 @@ naechste_stellung = [[]]
 am_zug = 'w'
 clock = pg.time.Clock()
 pg.display.set_caption('Philipps Schachprogramm')
-
+startfeld = ()
 # ab hier beginnt die Schleife, in der das eigentliche Spiel läuft
 while True:
     clock.tick(FPS)
-
     for ereignis in pg.event.get():
-        if ereignis.type == pg.MOUSEBUTTONDOWN:
-            startfeld = koordinaten_zu_feld(*pg.mouse.get_pos())
-            dorthinkannmanziehen = legale_zielfelder(startfeld)
-            print(dorthinkannmanziehen)
-            zeichne_stellung(dorthinkannmanziehen)
-            # TODO 2 mal linker Mausklick unterstützen
-        if ereignis.type == pg.MOUSEBUTTONUP:
-            zielfeld = koordinaten_zu_feld(*pg.mouse.get_pos())
-            if zielfeld in dorthinkannmanziehen:
-                am_zug = mache_zug(startfeld, zielfeld)
-        if ereignis.type == pg.QUIT:
+        event = ereignis.type
+        if event == pg.MOUSEBUTTONDOWN or event == pg.MOUSEBUTTONUP:
+            maus_feld = koordinaten_zu_feld(*pg.mouse.get_pos())
+            if startfeld == () or maus_feld not in legale_zielfelder(startfeld):
+                dorthinkannmanziehen = legale_zielfelder(maus_feld)
+                if dorthinkannmanziehen:
+                    startfeld = maus_feld
+                zeichne_stellung(dorthinkannmanziehen)
+            if maus_feld in legale_zielfelder(startfeld):
+                am_zug = mache_zug(startfeld, maus_feld)
+                startfeld = ()
+                dorthinkannmanziehen = []
+                zeichne_stellung()
+        if event == pg.QUIT:
             pg.quit()
             sys.exit()
-
-
