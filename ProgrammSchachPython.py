@@ -20,7 +20,7 @@ screen = pg.display.set_mode((BREITE, HOEHE))
 
 
 def mache_zug(von, nach):
-    figur = stellung[von[1]][von[0]]
+    figur = figur_auf(von[0], von[1])
     if figur == "-":
         return
     stellung[von[1]][von[0]] = "-"
@@ -45,6 +45,12 @@ def lade_figuren():
     return bilder
 
 
+def figur_auf(linie, reihe):
+    if not (0 <= linie <= 7 and 0 <= reihe <= 7):
+        return "x"
+    return stellung[reihe][linie]
+
+
 def ist_gegnerische_figur(figur):
     return (figur.islower() and am_zug == 'w') or (figur.isupper() and am_zug == 'b')
 
@@ -59,7 +65,7 @@ def legale_zielfelder(von_feld):
     if von_feld == ():
         return []
     startlinie, startreihe = von_feld
-    figur = stellung[startreihe][startlinie]
+    figur = figur_auf(startlinie, startreihe)
     if not ist_eigene_figur(figur):
         return []
     gerade_richtungen = ((-1, 0), (0, -1), (1, 0), (0, 1))  # oben, links, unten, rechts
@@ -78,37 +84,31 @@ def legale_zielfelder(von_feld):
     if figur.upper() == "K":
         return felder_in_richtung(startlinie, startreihe, 1, alle_richtungen)
     zielfelder = []
-    # TODO Schöner machen, en-passant, Bauernumwandlung
-    if figur == "P":
-        if stellung[startreihe - 1][startlinie] == "-":
-            zielfelder.append((startlinie, startreihe - 1))
-            if startreihe == 6 and stellung[startreihe - 2][startlinie] == "-":
-                zielfelder.append((startlinie, startreihe - 2))
-        if ist_gegnerische_figur(stellung[startreihe - 1][startlinie - 1]):
-            zielfelder.append((startlinie - 1, startreihe - 1))
-        if ist_gegnerische_figur(stellung[startreihe - 1][startlinie + 1]):
-            zielfelder.append((startlinie + 1, startreihe - 1))
-    if figur == "p":
-        if stellung[startreihe + 1][startlinie] == "-":
-            zielfelder.append((startlinie, startreihe + 1))
-            if startreihe == 1 and stellung[startreihe + 2][startlinie] == "-":
-                zielfelder.append((startlinie, startreihe + 2))
-        if ist_gegnerische_figur(stellung[startreihe + 1][startlinie - 1]):
-            zielfelder.append((startlinie - 1, startreihe + 1))
-        if ist_gegnerische_figur(stellung[startreihe + 1][startlinie + 1]):
-            zielfelder.append((startlinie + 1, startreihe + 1))
+    # TODO en-passant, Bauernumwandlung
+    if figur.upper() == "P":
+        richtung_reihe = (-1, 1)[figur.islower()]
+        ausgangsreihe = (6, 1)[figur.islower()]
+        reihe_ein_feld_vor = startreihe + richtung_reihe
+        reihe_zwei_felder_vor = startreihe + 2 * richtung_reihe
+        if figur_auf(startlinie, startreihe + richtung_reihe) == "-":
+            zielfelder.append((startlinie, reihe_ein_feld_vor))
+            if startreihe == ausgangsreihe and figur_auf(startlinie, reihe_zwei_felder_vor) == "-":
+                zielfelder.append((startlinie, reihe_zwei_felder_vor))
+        if ist_gegnerische_figur(figur_auf(startlinie - 1,  reihe_ein_feld_vor)):
+            zielfelder.append((startlinie - 1, reihe_ein_feld_vor))
+        if ist_gegnerische_figur(figur_auf(startlinie + 1,  reihe_ein_feld_vor)):
+            zielfelder.append((startlinie + 1, reihe_ein_feld_vor))
     return zielfelder
 
 
 def felder_in_richtung(startlinie, startreihe, maximale_entfernung, richtungen):
     zielfelder = []
-
     for richtung in richtungen:
         for i in range(1, maximale_entfernung + 1):
             end_reihe = startreihe + richtung[0] * i
             end_linie = startlinie + richtung[1] * i
             if 0 <= end_reihe <= 7 and 0 <= end_linie <= 7:  # nur innerhalb des Bretts
-                zielfeldfigur = stellung[end_reihe][end_linie]
+                zielfeldfigur = figur_auf(end_linie, end_reihe)
                 if ist_eigene_figur(zielfeldfigur):
                     break
                 zielfelder.append((end_linie, end_reihe))
@@ -117,33 +117,6 @@ def felder_in_richtung(startlinie, startreihe, maximale_entfernung, richtungen):
             else:
                 break
     return zielfelder
-
-
-def schraege_felder(startlinie, startreihe, maximale_entfernung):
-    zielfelder = []
-    richtungen = ((-1, 0), (0, -1), (1, 0), (0, 1))  # oben, links, unten, rechts
-    for richtung in richtungen:
-        for i in range(1, 8):
-            end_reihe = startreihe + richtung[0] * i
-            end_linie = startlinie + richtung[1] * i
-            if 0 <= end_reihe <= 7 and 0 <= end_linie <= 7:  # nur innerhalb des Bretts
-                zielfeldfigur = stellung[end_reihe][end_linie]
-                if ist_eigene_figur(zielfeldfigur):
-                    break
-                zielfelder.append((end_linie, end_reihe))
-                if ist_gegnerische_figur(zielfeldfigur):
-                    break
-            else:
-                break
-    return zielfelder
-
-
-def springer_felder(startlinie, startreihe):
-    pass
-
-
-def bauern_felder(startlinie, startreihe):
-    pass
 
 
 def erstelle_ausgangsstellung():
@@ -170,8 +143,8 @@ def zeichne_stellung(markierte_felder=None):
                 color = GREEN
             koordinate_x, koordinate_y = feld_zu_koordinaten(linie, reihe)
             pg.draw.rect(screen, color, [koordinate_x, koordinate_y, FELDBREITE, FELDHOEHE])
-            if stellung[reihe][linie] != '-':
-                screen.blit(bilder_der_figuren[stellung[reihe][linie]], (koordinate_x, koordinate_y))
+            if figur_auf(linie, reihe) != '-':
+                screen.blit(bilder_der_figuren[figur_auf(linie, reihe)], (koordinate_x, koordinate_y))
     pg.display.flip()
 
 
