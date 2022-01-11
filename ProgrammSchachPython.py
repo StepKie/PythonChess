@@ -20,21 +20,28 @@ screen = pg.display.set_mode((BREITE, HOEHE))
 
 
 def mache_zug(von, nach):
-    global am_zug, letzter_zug
+    global am_zug
     figur = figur_auf(*von)
     zielfeldfigur = figur_auf(*nach)
+    zug = (von, nach, figur, zielfeldfigur)
+    zuege.append(zug)
     if figur == "-":
         return
+    if figur == "P" and nach[1] == 0:
+        figur = "Q"
+    if figur == "p" and nach[1] == 7:
+        figur = "q"
     stellung[von[1]][von[0]] = "-"
     stellung[nach[1]][nach[0]] = figur
-    letzter_zug = von, nach, zielfeldfigur
     am_zug = 'b' if am_zug == 'w' else 'w'
 
 
 def nimm_zurueck():
     global am_zug
-    von, nach, geschlagene_figur = letzter_zug
-    stellung[von[1]][von[0]] = stellung[nach[1]][nach[0]]
+    if not zuege:
+        return
+    von, nach, schlagende_figur, geschlagene_figur = zuege.pop()
+    stellung[von[1]][von[0]] = schlagende_figur
     stellung[nach[1]][nach[0]] = geschlagene_figur
     am_zug = 'b' if am_zug == 'w' else 'w'
 
@@ -58,7 +65,7 @@ def lade_figuren():
 
 def figur_auf(linie, reihe):
     if not (0 <= linie <= 7 and 0 <= reihe <= 7):
-        return "x"
+        return "--"
     return stellung[reihe][linie]
 
 
@@ -77,24 +84,21 @@ def ist_schach():
                 for zielfeld in alle_zielfelder((linie, reihe)):
                     zielfeldfigur = figur_auf(*zielfeld)
                     if ist_gegnerische_figur(zielfeldfigur) and zielfeldfigur.upper() == "K":
-                        print("SCHACH!")
                         return True
     return False
 
 
 def legale_zielfelder(von_feld):
-    zielfelder = alle_zielfelder(von_feld)
-    # Entferne Felder wenn man in der resultierenden Stellung im Schach stünde
-    for zielfeld in zielfelder:
+    zielfelder = []
+    # Füge nur die Felder hinzu wenn man in der resultierenden Stellung nicht im Schach steht
+    for zielfeld in alle_zielfelder(von_feld):
         mache_zug(von_feld, zielfeld)
-        if ist_schach():
-            zielfelder.remove(zielfeld)
+        if not ist_schach():
+            zielfelder.append(zielfeld)
         nimm_zurueck()
     return zielfelder
 
 
-# TODO Prüfe, ob entstehende Stellung legal ist -
-# (eigener König kann danach nicht "geschlagen" werden - d.h. im Schach oder Könige nebeneinander)
 def alle_zielfelder(von_feld):
     if von_feld == ():
         return []
@@ -118,7 +122,7 @@ def alle_zielfelder(von_feld):
     if figur.upper() == "K":
         return felder_in_richtung(startlinie, startreihe, 1, alle_richtungen)
     zielfelder = []
-    # TODO en-passant, Bauernumwandlung
+    # TODO en-passant
     if figur.upper() == "P":
         richtung_reihe = (-1, 1)[figur.islower()]
         ausgangsreihe = (6, 1)[figur.islower()]
@@ -133,7 +137,6 @@ def alle_zielfelder(von_feld):
         if ist_gegnerische_figur(figur_auf(startlinie + 1,  reihe_ein_feld_vor)):
             zielfelder.append((startlinie + 1, reihe_ein_feld_vor))
     return zielfelder
-
 
 
 def felder_in_richtung(startlinie, startreihe, maximale_entfernung, richtungen):
@@ -197,8 +200,8 @@ zeichne_stellung()
 
 am_zug = 'w'
 
-# von, nach, was wurde geschlagen
-letzter_zug = ((), (), "-")
+# Liste mit Tupeln der Form (von, nach, schlagende_figur - wg. Bauernumwandlung auch merken!-, geschlagene_figur)
+zuege = []
 
 clock = pg.time.Clock()
 pg.display.set_caption('Philipps Schachprogramm')
@@ -210,16 +213,16 @@ while True:
         ereignis_typ = ereignis.type
         if ereignis_typ == pg.MOUSEBUTTONDOWN or ereignis_typ == pg.MOUSEBUTTONUP:
             maus_feld = koordinaten_zu_feld(*pg.mouse.get_pos())
-            if startfeld == () or maus_feld not in legale_zielfelder(startfeld):
-                dorthinkannmanziehen = legale_zielfelder(maus_feld)
-                if dorthinkannmanziehen:
-                    startfeld = maus_feld
-                zeichne_stellung(dorthinkannmanziehen)
-            if maus_feld in legale_zielfelder(startfeld):
+            if startfeld and maus_feld in legale_zielfelder(startfeld):
                 mache_zug(startfeld, maus_feld)
                 startfeld = ()
                 dorthinkannmanziehen = []
                 zeichne_stellung()
+            else:
+                dorthinkannmanziehen = legale_zielfelder(maus_feld)
+                if dorthinkannmanziehen:
+                    startfeld = maus_feld
+                zeichne_stellung(dorthinkannmanziehen)
         elif ereignis_typ == pg.KEYDOWN and ereignis.key == pg.K_z:
             print("Zurück")
             nimm_zurueck()
