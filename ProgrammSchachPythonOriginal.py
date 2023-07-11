@@ -90,7 +90,7 @@ def ist_schach():
 
 def legale_zielfelder(von_feld):
     zielfelder = []
-    # Füge nur die Felder hinzu wenn man in der resultierenden Stellung nicht im Schach steht
+    # Füge nur die Felder hinzu, wenn man in der resultierenden Stellung nicht im Schach steht
     for zielfeld in alle_zielfelder(von_feld):
         mache_zug(von_feld, zielfeld)
         if not ist_schach():
@@ -107,7 +107,7 @@ def alle_zielfelder(von_feld):
     if not ist_eigene_figur(figur):
         return []
     gerade_richtungen = ((-1, 0), (0, -1), (1, 0), (0, 1))  # oben, links, unten, rechts
-    schraege_richtungen = ((-1, -1), (-1, 1), (1, 1), (1, -1))  # linksoben, rechtsoben, rechtsunten, linksunten
+    schraege_richtungen = ((-1, -1), (-1, 1), (1, 1), (1, -1))  # links oben, rechts oben, rechts unten, links unten
     springer_richtungen = ((-2, -1), (-1, -2), (1, -2), (2, -1), (2, 1), (1, 2), (-1, 2), (-2, 1))
     alle_richtungen = gerade_richtungen + schraege_richtungen
     if figur.upper() == "N":
@@ -216,13 +216,13 @@ while True:
             if startfeld and maus_feld in legale_zielfelder(startfeld):
                 mache_zug(startfeld, maus_feld)
                 startfeld = ()
-                dorthinkannmanziehen = []
+                dorthin_kann_man_ziehen = []
                 zeichne_stellung()
             else:
-                dorthinkannmanziehen = legale_zielfelder(maus_feld)
-                if dorthinkannmanziehen:
+                dorthin_kann_man_ziehen = legale_zielfelder(maus_feld)
+                if dorthin_kann_man_ziehen:
                     startfeld = maus_feld
-                zeichne_stellung(dorthinkannmanziehen)
+                zeichne_stellung(dorthin_kann_man_ziehen)
         elif ereignis_typ == pg.KEYDOWN and ereignis.key == pg.K_z:
             print("Zurück")
             nimm_zurueck()
