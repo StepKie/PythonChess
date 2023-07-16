@@ -4,7 +4,6 @@ FILE_NAMES = ["a", "b", "c", "d", "e", "f", "g", "h"]
 RANK_NAMES = ["8", "7", "6", "5", "4", "3", "2", "1"]
 SQUARE_NAMES = [f + r for r in RANK_NAMES for f in FILE_NAMES]
 TARGET_SQUARE_STATES = [EMPTY_SQUARE, SAME_COLOR, OPPOSITE_COLOR] = range(1, 4)
-# not yet used, we would like to encode like this instead of array
 # noinspection SpellCheckingInspection
 FEN_INITIAL_POSITION = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
@@ -54,25 +53,26 @@ class Move:
         return repr(self.start_square) + repr(self.end_square)
 
 
-def create_initial_position():
-    initial_position = [
-        ["r", "n", "b", "q", "k", "b", "n", "r"],
-        ["p", "p", "p", "p", "p", "p", "p", "p"],
-        ["-", "-", "-", "-", "-", "-", "-", "-"],
-        ["-", "-", "-", "-", "-", "-", "-", "-"],
-        ["-", "-", "-", "-", "-", "-", "-", "-"],
-        ["-", "-", "-", "-", "-", "-", "-", "-"],
-        ["P", "P", "P", "P", "P", "P", "P", "P"],
-        ["R", "N", "B", "Q", "K", "B", "N", "R"]
-    ]
-    squares = [Square(file, rank, ChessPiece.from_symbol(initial_position[rank][file])) for rank in range(8) for file in
-               range(8)]
+def create_position(fen: str):
+    fen_parts = fen.split("/")[:8]  # Split and truncate before the first space
+    squares = []
+    for rank_index, fen_rank in enumerate(fen_parts):
+        file_index = 0
+        for char in fen_rank:
+            if char.isdigit():  # add as many empty squares as indicated by number
+                num_empty_squares = int(char)
+                squares.extend([Square(file_index + i, rank_index, piece=None) for i in range(num_empty_squares)])
+                file_index += num_empty_squares
+            else:
+                piece = ChessPiece.from_symbol(char)
+                squares.append(Square(file_index, rank_index, piece))
+                file_index += 1
     return squares
 
 
 class ChessBoard:
     def __init__(self):
-        self.squares = create_initial_position()
+        self.squares = create_position(FEN_INITIAL_POSITION)
         self.current_player = WHITE
         self.moves = []
 
