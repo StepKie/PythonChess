@@ -1,5 +1,7 @@
+from operator import contains
+
+from ChessBoard import ChessBoard, Move
 from ChessPiece import WHITE, BLACK
-from ChessBoard import ChessBoard, Move, Square
 
 
 # Currently, this class is hardly used, since most logic is in the ChessBoard. This may change as new functionality
@@ -20,6 +22,8 @@ class GameManager:
     # Hm. learning to use @singledispatch, @overload. None of these were particularly better than this on first try
     def exec_move(self, start_square, end_square):
         move = Move(start_square, end_square)
+        if not str(move.end_square) in [str(x.end_square) for x in self.chessboard.legal_moves_from(start_square)]:
+            raise ValueError(f"{move} is not a legal move")
         move.execute()
         self.moves.append(move)
         self.switch_turn()

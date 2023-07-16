@@ -117,43 +117,38 @@ class ChessBoard:
         moved_piece = from_square.piece
         if moved_piece is None:
             return []
-
         piece_type = moved_piece.piece_type
-        piece_color = moved_piece.color
-
         straight_directions = ((-1, 0), (0, -1), (1, 0), (0, 1))  # up, left, down, right
         diagonal_directions = ((-1, -1), (-1, 1), (1, 1), (1, -1))  # up-left, up-right, down-right, down-left
         knight_directions = ((-2, -1), (-1, -2), (1, -2), (2, -1), (2, 1), (1, 2), (-1, 2), (-2, 1))
         all_directions = straight_directions + diagonal_directions
-        if piece_type == KNIGHT:
-            return self.fields_in_direction(from_square, 1, knight_directions)
-        if piece_type == BISHOP:
-            return self.fields_in_direction(from_square, 7, diagonal_directions)
-        if piece_type == ROOK:
-            return self.fields_in_direction(from_square, 7, straight_directions)
-        if piece_type == QUEEN:
-            return self.fields_in_direction(from_square, 7, all_directions)
+        movements = {KNIGHT: (1, knight_directions), BISHOP: (7, diagonal_directions),
+                     ROOK: (7, straight_directions), QUEEN: (7, all_directions), KING: (1, all_directions)}
         # TODO castling
-        if piece_type == KING:
-            return self.fields_in_direction(from_square, 1, all_directions)
+        return self.fields_in_direction(from_square, *movements[piece_type]) if piece_type != PAWN else \
+            self.pawn_squares(from_square)
+
+    def pawn_squares(self, from_square):
         target_squares = []
         # TODO en-passant
         from_file = from_square.file
         from_rank = from_square.rank
-        if piece_type == PAWN:
-            direction_row = (-1, 1)[piece_color == BLACK]
-            starting_row = (6, 1)[piece_color == BLACK]
-            rank_one_step = from_rank + direction_row
-            rank_two_steps = from_rank + 2 * direction_row
-            if self.get_square(from_file, rank_one_step).status(piece_color) == EMPTY_SQUARE:
-                target_squares.append(self.get_square(from_file, rank_one_step))
-                if from_rank == starting_row and self.get_square(from_file, rank_two_steps).status(
-                        piece_color) == EMPTY_SQUARE:
-                    target_squares.append(self.get_square(from_file, rank_two_steps))
-            if from_file > 0 and self.get_square(from_file - 1, rank_one_step).status(piece_color) == OPPOSITE_COLOR:
-                target_squares.append(self.get_square(from_file - 1, rank_one_step))
-            if self.get_square(from_file + 1, rank_one_step).status(piece_color) == OPPOSITE_COLOR:
-                target_squares.append(self.get_square(from_file + 1, rank_one_step))
+        piece_color = from_square.piece.color
+
+        direction_row = (-1, 1)[piece_color == BLACK]
+        starting_row = (6, 1)[piece_color == BLACK]
+        sq_1up = self.get_square(from_file, from_rank + direction_row)
+        sq_2up = self.get_square(from_file, from_rank + 2 * direction_row)
+        sq_1diag = self.get_square(from_file - 1, from_rank + direction_row)
+        sq_2diag = self.get_square(from_file + 1, from_rank + direction_row)
+        if sq_1up.status(piece_color) == EMPTY_SQUARE:
+            target_squares.append(sq_1up)
+            if from_rank == starting_row and sq_2up.status(piece_color) == EMPTY_SQUARE:
+                target_squares.append(sq_2up)
+        if from_file > 0 and sq_1diag.status(piece_color) == OPPOSITE_COLOR:
+            target_squares.append(sq_1diag)
+        if sq_2diag.status(piece_color) == OPPOSITE_COLOR:
+            target_squares.append(sq_2diag)
         return target_squares
 
     def fields_in_direction(self, start_square: Square, max_distance, directions):

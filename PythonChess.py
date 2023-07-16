@@ -1,7 +1,9 @@
-import pygame as pg
 import sys
+
+import pygame as pg
+
 from BoardRenderer import BoardRenderer
-from ChessBoard import ChessBoard, Move
+from ChessBoard import ChessBoard
 from GameManager import GameManager
 
 

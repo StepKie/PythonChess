@@ -1,7 +1,6 @@
 import pytest
 
-from ChessBoard import ChessBoard, Square, Move
-from ChessPiece import *
+from ChessBoard import ChessBoard
 from GameManager import GameManager
 
 
@@ -30,6 +29,12 @@ def test_is_check(chessboard):
 
     game_manager.make_move("f1", "b5")
     assert chessboard.is_check()
+
+
+def test_raises_on_illegal_move(chessboard):
+    with pytest.raises(ValueError):
+        game_manager = GameManager(chessboard)
+        game_manager.make_move("e2", "e5")
 
 
 def test_is_mate(chessboard):
