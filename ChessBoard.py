@@ -1,4 +1,7 @@
+from typing import List
+
 from ChessPiece import *
+
 
 FILE_NAMES = ["a", "b", "c", "d", "e", "f", "g", "h"]
 RANK_NAMES = ["8", "7", "6", "5", "4", "3", "2", "1"]
@@ -28,11 +31,13 @@ class Square:
 
 
 class Move:
-    def __init__(self, start_square: Square, end_square):
+    def __init__(self, start_square: Square, end_square: Square):
         self.start_square = start_square
         self.end_square = end_square
         self.piece = self.start_square.piece
         self.captured_piece = self.end_square.piece
+        self.removed_castling_rights = self.affected_castling_rights()
+
 
     def execute(self):
         if self.piece == ChessPiece(PAWN, WHITE) and self.end_square.rank == 0:
@@ -44,6 +49,7 @@ class Move:
 
         self.start_square.piece = None
         self.end_square.piece = final_piece
+        self.removed_castling_rights = self.affected_castling_rights()
 
     def undo(self):
         self.end_square.piece = self.captured_piece
@@ -51,6 +57,18 @@ class Move:
 
     def __repr__(self) -> str:
         return repr(self.start_square) + repr(self.end_square)
+
+    def affected_castling_rights(self):
+        affected_rights = {
+            (KING, WHITE): "KQ",
+            (KING, BLACK): "kq",
+            (ROOK, WHITE, "a1"): "Q",
+            (ROOK, BLACK, "a8"): "q",
+            (ROOK, WHITE, "h1"): "K",
+            (ROOK, BLACK, "h8"): "k"
+        }
+
+        return affected_rights.get((self.piece, self.piece.color, str(self.start_square)), "")
 
 
 def create_position(fen: str):
@@ -82,12 +100,15 @@ class ChessBoard:
     def square(self, notation: str):
         return self.get_square(FILE_NAMES.index(notation[0]), RANK_NAMES.index(notation[1]))
 
+    def get_attacked_squares(self) -> List[Square]:
+        return [attacked_square for opp_occupied_square in
+                filter(lambda sq: sq.status(self.current_player) == OPPOSITE_COLOR, self.squares)
+                for attacked_square in self.all_target_squares(opp_occupied_square)]
+
     def is_check(self):
-        for opponent_occupied_square in filter(lambda sq: sq.status(self.current_player) == OPPOSITE_COLOR,
-                                               self.squares):
-            for attacked_square in self.all_target_squares(opponent_occupied_square):
-                if (piece := attacked_square.piece) is not None and piece.piece_type == KING:
-                    return True
+        for attacked_square in self.get_attacked_squares():
+            if (piece := attacked_square.piece) is not None and piece.piece_type == KING:
+                return True
         return False
 
     def is_mate(self):
@@ -104,6 +125,12 @@ class ChessBoard:
                     legal_moves.append(candidate_move)
                 candidate_move.undo()
         return legal_moves
+
+    def is_legal(self, move: Move):
+        if isinstance(move, CastlingMove):
+            return all(square not in self.get_attacked_squares() for square in
+                       [move.move_rook.end_square, move.move_king.start_square, move.move_king.end_square])
+        return self.is_check()
 
     def legal_moves(self):
         # list comprehension instead would be the following, readability debatable
@@ -169,3 +196,28 @@ class ChessBoard:
                 else:
                     break
         return target_squares
+
+class CastlingMove(Move):
+    def __init__(self, board: ChessBoard, type: ChessPiece):
+        self.board = board
+        king_end_file = "g" if type.piece_type is KING else "c"
+        rook_start_file = "h" if type.piece_type is KING else "a"
+        rook_end_file = "f" if type.piece_type is KING else "d"
+        rank = 1 if type.color is WHITE else 8
+
+        self.move_king = Move(board.square(f"e{rank}"), board.square(f"{king_end_file}{rank}"))
+        self.move_rook = Move(board.square(f"{rook_start_file}{rank}"), board.square(f"{rook_end_file}{rank}"))
+
+    def execute(self):
+        self.move_king.execute()
+        self.move_rook.execute()
+
+    def undo(self):
+        self.move_king.undo()
+        self.move_rook.undo()
+
+    def __repr__(self) -> str:
+        return super().__repr__() + repr(self.rook_start_square) + repr(self.rook_end_square)
+
+    def __str__(self) -> str:
+        return "0-0" if FILE_NAMES[self.move_king.end_square.file] == "g" else "0-0-0"
