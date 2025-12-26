@@ -26,7 +26,12 @@ class GameManager:
         move = Move(start_square, end_square)
         legal_moves = self.chessboard.legal_moves_from(start_square)
         if move.end_square not in [m.end_square for m in legal_moves]:
-            raise ValueError(f"{move} is not a legal move")
+            piece_name = start_square.piece.name() if start_square.piece else "empty square"
+            legal_destinations = ", ".join(str(m.end_square) for m in legal_moves) if legal_moves else "none"
+            raise ValueError(
+                f"Illegal move: {piece_name} on {start_square} cannot move to {end_square}. "
+                f"Legal moves: {legal_destinations}"
+            )
         move.execute()
         self.moves.append(move)
         self.switch_turn()

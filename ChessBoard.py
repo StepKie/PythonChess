@@ -67,6 +67,7 @@ class Move:
         self.end_square = end_square
         self.piece = self.start_square.piece
         self.captured_piece = self.end_square.piece
+        # Track castling rights for future castling implementation
         self.removed_castling_rights = self.affected_castling_rights()
 
 
@@ -146,11 +147,13 @@ class ChessBoard:
         return self.get_square(FILE_NAMES.index(notation[0]), RANK_NAMES.index(notation[1]))
 
     def get_attacked_squares(self) -> List[Square]:
+        """Get all squares attacked by the opponent's pieces."""
         return [attacked_square for opp_occupied_square in
                 filter(lambda sq: sq.status(self.current_player) == OPPOSITE_COLOR, self.squares)
                 for attacked_square in self.all_target_squares(opp_occupied_square)]
 
     def is_check(self):
+        """Check if the current player's king is under attack."""
         return any(
             attacked_square.piece.piece_type == KING
             for attacked_square in self.get_attacked_squares()
@@ -158,9 +161,19 @@ class ChessBoard:
         )
 
     def is_mate(self):
+        """Check if the current player is in checkmate."""
         return self.is_check() and not self.legal_moves()
+    
+    def is_stalemate(self):
+        """Check if the current player is in stalemate (no legal moves but not in check)."""
+        return not self.is_check() and not self.legal_moves()
+    
+    def is_game_over(self):
+        """Check if the game is over (checkmate or stalemate)."""
+        return not self.legal_moves()
 
     def legal_moves_from(self, from_square):
+        """Get all legal moves from a given square."""
         legal_moves = []
         if from_square.status(self.current_player) == SAME_COLOR:
             for target_square in self.all_target_squares(from_square):
@@ -178,12 +191,8 @@ class ChessBoard:
         return is_valid
 
     def legal_moves(self):
-        # list comprehension instead would be the following, readability debatable
-        # return [move for square in self.squares for move in self.legal_moves_from(square)]
-        legal_moves = []
-        for square in self.squares:
-            legal_moves += self.legal_moves_from(square)
-        return legal_moves
+        """Get all legal moves for the current player."""
+        return [move for square in self.squares for move in self.legal_moves_from(square)]
 
     def all_target_squares(self, from_square: Square):
         moved_piece = from_square.piece
@@ -220,7 +229,7 @@ class ChessBoard:
                 target_squares.append(two_squares_forward)
         if from_file > 0 and left_diagonal.status(piece_color) == OPPOSITE_COLOR:
             target_squares.append(left_diagonal)
-        if right_diagonal.status(piece_color) == OPPOSITE_COLOR:
+        if from_file < 7 and right_diagonal.status(piece_color) == OPPOSITE_COLOR:
             target_squares.append(right_diagonal)
         return target_squares
 
