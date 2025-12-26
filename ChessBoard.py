@@ -10,8 +10,29 @@ TARGET_SQUARE_STATES = [EMPTY_SQUARE, SAME_COLOR, OPPOSITE_COLOR] = range(1, 4)
 # noinspection SpellCheckingInspection
 FEN_INITIAL_POSITION = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
+# Pawn starting ranks
+WHITE_PAWN_START_RANK = 6
+BLACK_PAWN_START_RANK = 1
+
+# Promotion ranks
+WHITE_PROMOTION_RANK = 0  # 8th rank (index 0)
+BLACK_PROMOTION_RANK = 7  # 1st rank (index 7)
+
+# Movement directions
+STRAIGHT_DIRECTIONS = ((-1, 0), (0, -1), (1, 0), (0, 1))  # up, left, down, right
+DIAGONAL_DIRECTIONS = ((-1, -1), (-1, 1), (1, 1), (1, -1))  # up-left, up-right, down-right, down-left
+KNIGHT_DIRECTIONS = ((-2, -1), (-1, -2), (1, -2), (2, -1), (2, 1), (1, 2), (-1, 2), (-2, 1))
+ALL_DIRECTIONS = STRAIGHT_DIRECTIONS + DIAGONAL_DIRECTIONS
+
 
 class Square:
+    """Represents a square on the chess board.
+    
+    Attributes:
+        file: Column index (0=a, ..., 7=h)
+        rank: Row index (0=8, ..., 7=1)
+        piece: ChessPiece on this square, or None if empty
+    """
 
     def __init__(self, file: int, rank: int, piece: Optional[ChessPiece] = None):
         self.file = file  # 0=a, ..., 7=h
@@ -22,7 +43,12 @@ class Square:
         return FILE_NAMES[self.file] + RANK_NAMES[self.rank]
 
     def __repr__(self) -> str:
-        return FILE_NAMES[self.file] + RANK_NAMES[self.rank]
+        return f"Square({str(self)})"
+    
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, Square):
+            return False
+        return self.file == other.file and self.rank == other.rank
 
     def status(self, color: Color):
         if self.piece is None:
@@ -31,6 +57,11 @@ class Square:
 
 
 class Move:
+    """Represents a chess move from one square to another.
+    
+    Handles move execution, undo, and pawn promotion.
+    """
+    
     def __init__(self, start_square: Square, end_square: Square):
         self.start_square = start_square
         self.end_square = end_square
@@ -40,10 +71,15 @@ class Move:
 
 
     def execute(self):
-        if self.piece == ChessPiece(PAWN, WHITE) and self.end_square.rank == 0:
-            final_piece = ChessPiece(QUEEN, WHITE)
-        elif self.piece == ChessPiece(PAWN, BLACK) and self.end_square.rank == 7:
-            final_piece = ChessPiece(QUEEN, BLACK)
+        """Execute the move, handling pawn promotion automatically."""
+        # Check for pawn promotion
+        if self.piece.piece_type == PAWN:
+            if self.piece.color == WHITE and self.end_square.rank == WHITE_PROMOTION_RANK:
+                final_piece = ChessPiece(QUEEN, WHITE)
+            elif self.piece.color == BLACK and self.end_square.rank == BLACK_PROMOTION_RANK:
+                final_piece = ChessPiece(QUEEN, BLACK)
+            else:
+                final_piece = self.piece
         else:
             final_piece = self.piece
 
@@ -89,6 +125,11 @@ def create_position(fen: str):
 
 
 class ChessBoard:
+    """Represents a chess board with pieces and game state.
+    
+    Manages board state, move generation, and game rules like check and checkmate.
+    """
+    
     def __init__(self):
         self.squares = create_position(FEN_INITIAL_POSITION)
         self.current_player = WHITE
@@ -96,6 +137,10 @@ class ChessBoard:
 
     def get_square(self, file: int, rank: int):
         return self.squares[rank * 8 + file]
+    
+    def is_within_bounds(self, file: int, rank: int) -> bool:
+        """Check if file and rank are within board boundaries."""
+        return 0 <= file <= 7 and 0 <= rank <= 7
 
     def square(self, notation: str):
         return self.get_square(FILE_NAMES.index(notation[0]), RANK_NAMES.index(notation[1]))
@@ -106,10 +151,11 @@ class ChessBoard:
                 for attacked_square in self.all_target_squares(opp_occupied_square)]
 
     def is_check(self):
-        for attacked_square in self.get_attacked_squares():
-            if (piece := attacked_square.piece) is not None and piece.piece_type == KING:
-                return True
-        return False
+        return any(
+            attacked_square.piece.piece_type == KING
+            for attacked_square in self.get_attacked_squares()
+            if attacked_square.piece is not None
+        )
 
     def is_mate(self):
         return self.is_check() and not self.legal_moves()
@@ -119,18 +165,17 @@ class ChessBoard:
         if from_square.status(self.current_player) == SAME_COLOR:
             for target_square in self.all_target_squares(from_square):
                 candidate_move = Move(from_square, target_square)
-                candidate_move.execute()
-                # only add moves where the player does not end up in check
-                if not self.is_check():
+                if self.is_legal(candidate_move):
                     legal_moves.append(candidate_move)
-                candidate_move.undo()
         return legal_moves
 
-    def is_legal(self, move: Move):
-        if isinstance(move, CastlingMove):
-            return all(square not in self.get_attacked_squares() for square in
-                       [move.move_rook.end_square, move.move_king.start_square, move.move_king.end_square])
-        return self.is_check()
+    def is_legal(self, move: Move) -> bool:
+        """Check if a move is legal by executing it, checking for check, then undoing it."""
+        # TODO: Add special castling validation when castling is implemented
+        move.execute()
+        is_valid = not self.is_check()
+        move.undo()
+        return is_valid
 
     def legal_moves(self):
         # list comprehension instead would be the following, readability debatable
@@ -145,12 +190,13 @@ class ChessBoard:
         if moved_piece is None:
             return []
         piece_type = moved_piece.piece_type
-        straight_directions = ((-1, 0), (0, -1), (1, 0), (0, 1))  # up, left, down, right
-        diagonal_directions = ((-1, -1), (-1, 1), (1, 1), (1, -1))  # up-left, up-right, down-right, down-left
-        knight_directions = ((-2, -1), (-1, -2), (1, -2), (2, -1), (2, 1), (1, 2), (-1, 2), (-2, 1))
-        all_directions = straight_directions + diagonal_directions
-        movements = {KNIGHT: (1, knight_directions), BISHOP: (7, diagonal_directions),
-                     ROOK: (7, straight_directions), QUEEN: (7, all_directions), KING: (1, all_directions)}
+        movements = {
+            KNIGHT: (1, KNIGHT_DIRECTIONS),
+            BISHOP: (7, DIAGONAL_DIRECTIONS),
+            ROOK: (7, STRAIGHT_DIRECTIONS),
+            QUEEN: (7, ALL_DIRECTIONS),
+            KING: (1, ALL_DIRECTIONS)
+        }
         # TODO castling
         return self.fields_in_direction(from_square, *movements[piece_type]) if piece_type != PAWN else \
             self.pawn_squares(from_square)
@@ -163,19 +209,19 @@ class ChessBoard:
         piece_color = from_square.piece.color
 
         direction_row = (-1, 1)[piece_color == BLACK]
-        starting_row = (6, 1)[piece_color == BLACK]
-        sq_1up = self.get_square(from_file, from_rank + direction_row)
-        sq_2up = self.get_square(from_file, from_rank + 2 * direction_row)
-        sq_1diag = self.get_square(from_file - 1, from_rank + direction_row)
-        sq_2diag = self.get_square(from_file + 1, from_rank + direction_row)
-        if sq_1up.status(piece_color) == EMPTY_SQUARE:
-            target_squares.append(sq_1up)
-            if from_rank == starting_row and sq_2up.status(piece_color) == EMPTY_SQUARE:
-                target_squares.append(sq_2up)
-        if from_file > 0 and sq_1diag.status(piece_color) == OPPOSITE_COLOR:
-            target_squares.append(sq_1diag)
-        if sq_2diag.status(piece_color) == OPPOSITE_COLOR:
-            target_squares.append(sq_2diag)
+        starting_row = (WHITE_PAWN_START_RANK, BLACK_PAWN_START_RANK)[piece_color == BLACK]
+        one_square_forward = self.get_square(from_file, from_rank + direction_row)
+        two_squares_forward = self.get_square(from_file, from_rank + 2 * direction_row)
+        left_diagonal = self.get_square(from_file - 1, from_rank + direction_row)
+        right_diagonal = self.get_square(from_file + 1, from_rank + direction_row)
+        if one_square_forward.status(piece_color) == EMPTY_SQUARE:
+            target_squares.append(one_square_forward)
+            if from_rank == starting_row and two_squares_forward.status(piece_color) == EMPTY_SQUARE:
+                target_squares.append(two_squares_forward)
+        if from_file > 0 and left_diagonal.status(piece_color) == OPPOSITE_COLOR:
+            target_squares.append(left_diagonal)
+        if right_diagonal.status(piece_color) == OPPOSITE_COLOR:
+            target_squares.append(right_diagonal)
         return target_squares
 
     def fields_in_direction(self, start_square: Square, max_distance, directions):
@@ -185,39 +231,13 @@ class ChessBoard:
             for i in range(1, max_distance + 1):
                 end_file = start_square.file + direction[1] * i
                 end_rank = start_square.rank + direction[0] * i
-                if 0 <= end_rank <= 7 and 0 <= end_file <= 7:  # only within board bounds
-                    target_square = self.get_square(end_file, end_rank)
-                    target_square_status = target_square.status(from_color)
-                    if target_square_status == SAME_COLOR:
-                        break
-                    target_squares.append(target_square)
-                    if target_square_status == OPPOSITE_COLOR:
-                        break
-                else:
+                if not self.is_within_bounds(end_file, end_rank):
+                    break
+                target_square = self.get_square(end_file, end_rank)
+                target_square_status = target_square.status(from_color)
+                if target_square_status == SAME_COLOR:
+                    break
+                target_squares.append(target_square)
+                if target_square_status == OPPOSITE_COLOR:
                     break
         return target_squares
-
-class CastlingMove(Move):
-    def __init__(self, board: ChessBoard, type: ChessPiece):
-        self.board = board
-        king_end_file = "g" if type.piece_type is KING else "c"
-        rook_start_file = "h" if type.piece_type is KING else "a"
-        rook_end_file = "f" if type.piece_type is KING else "d"
-        rank = 1 if type.color is WHITE else 8
-
-        self.move_king = Move(board.square(f"e{rank}"), board.square(f"{king_end_file}{rank}"))
-        self.move_rook = Move(board.square(f"{rook_start_file}{rank}"), board.square(f"{rook_end_file}{rank}"))
-
-    def execute(self):
-        self.move_king.execute()
-        self.move_rook.execute()
-
-    def undo(self):
-        self.move_king.undo()
-        self.move_rook.undo()
-
-    def __repr__(self) -> str:
-        return super().__repr__() + repr(self.rook_start_square) + repr(self.rook_end_square)
-
-    def __str__(self) -> str:
-        return "0-0" if FILE_NAMES[self.move_king.end_square.file] == "g" else "0-0-0"
