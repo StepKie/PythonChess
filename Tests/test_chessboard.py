@@ -133,3 +133,63 @@ def test_insufficient_material(chessboard):
     # King and two Knights vs King (sufficient material for mate, though difficult)
     chessboard.squares = create_position("8/8/8/4k3/8/4KNN1/8/8 w - - 0 1")
     assert not chessboard.has_insufficient_material()
+
+
+def test_en_passant(chessboard, game_manager):
+    """En passant capture works correctly"""
+    from SpecialMoves import EnPassantMove
+    
+    # Set up position: White pawn on e5, ready for black pawn on d7 to advance
+    game_manager.make_move("e2", "e4")
+    game_manager.make_move("a7", "a6")  # Random black move
+    game_manager.make_move("e4", "e5")
+    
+    # Black pawn advances two squares, landing next to white pawn
+    game_manager.make_move("d7", "d5")
+    
+    # White should be able to capture en passant
+    e5 = chessboard.square("e5")
+    legal_moves = chessboard.legal_moves_from(e5)
+    
+    # Check that d6 is a legal target (en passant square)
+    d6 = chessboard.square("d6")
+    assert d6 in [m.end_square for m in legal_moves], "En passant should be available"
+    
+    # Find and execute the en passant move
+    ep_move = next((m for m in legal_moves if m.end_square == d6), None)
+    assert isinstance(ep_move, EnPassantMove), "Should be an EnPassantMove"
+    
+    # Execute en passant
+    game_manager.exec_move(e5, d6)
+    
+    # Verify black pawn on d5 was captured
+    d5 = chessboard.square("d5")
+    assert d5.piece is None, "Captured pawn should be removed"
+    
+    # Verify white pawn is now on d6
+    assert d6.piece is not None and d6.piece.color, "White pawn should be on d6"
+
+
+def test_en_passant_expires(chessboard, game_manager):
+    """En passant opportunity expires after one move"""
+    # Set up position: White pawn on e5
+    game_manager.make_move("e2", "e4")
+    game_manager.make_move("a7", "a6")
+    game_manager.make_move("e4", "e5")
+    
+    # Black pawn advances two squares
+    game_manager.make_move("d7", "d5")
+    
+    # White makes a different move (not en passant)
+    game_manager.make_move("a2", "a3")
+    
+    # Black makes another move
+    game_manager.make_move("a6", "a5")
+    
+    # Now en passant should NOT be available
+    e5 = chessboard.square("e5")
+    legal_moves = chessboard.legal_moves_from(e5)
+    d6 = chessboard.square("d6")
+    
+    assert d6 not in [m.end_square for m in legal_moves], "En passant should have expired"
+

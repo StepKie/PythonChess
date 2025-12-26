@@ -174,6 +174,7 @@ class ChessBoard:
         self.squares = create_position(FEN_INITIAL_POSITION)
         self.current_player = WHITE
         self.moves = []
+        self.last_move = None  # Track last move for en passant
     
     @property
     def opponent_color(self) -> Color:
@@ -298,11 +299,13 @@ class ChessBoard:
         return False
 
     def legal_moves_from(self, from_square):
-        """Get all legal moves from a given square."""
+        """Get all legal moves from a given square, including special moves."""
+        from SpecialMoves import create_move
+        
         legal_moves = []
         if from_square.status(self.current_player) == SAME_COLOR:
             for target_square in self.all_target_squares(from_square):
-                candidate_move = Move(from_square, target_square)
+                candidate_move = create_move(self, from_square, target_square)
                 if self.is_legal(candidate_move):
                     legal_moves.append(candidate_move)
         return legal_moves
@@ -336,8 +339,8 @@ class ChessBoard:
             self.pawn_squares(from_square)
 
     def pawn_squares(self, from_square):
+        """Get all possible target squares for a pawn, including en passant."""
         target_squares = []
-        # TODO en-passant
         from_file = from_square.file
         from_rank = from_square.rank
         piece_color = from_square.piece.color
@@ -346,16 +349,29 @@ class ChessBoard:
         starting_row = BLACK_PAWN_START_RANK if piece_color == BLACK else WHITE_PAWN_START_RANK
         one_square_forward = self.get_square(from_file, from_rank + direction_row)
         two_squares_forward = self.get_square(from_file, from_rank + 2 * direction_row)
-        left_diagonal = self.get_square(from_file - 1, from_rank + direction_row)
-        right_diagonal = self.get_square(from_file + 1, from_rank + direction_row)
+        
+        # Forward moves
         if one_square_forward.status(piece_color) == EMPTY_SQUARE:
             target_squares.append(one_square_forward)
             if from_rank == starting_row and two_squares_forward.status(piece_color) == EMPTY_SQUARE:
                 target_squares.append(two_squares_forward)
-        if from_file > 0 and left_diagonal.status(piece_color) == OPPOSITE_COLOR:
-            target_squares.append(left_diagonal)
-        if from_file < 7 and right_diagonal.status(piece_color) == OPPOSITE_COLOR:
-            target_squares.append(right_diagonal)
+        
+        # Diagonal captures
+        if from_file > 0:
+            left_diagonal = self.get_square(from_file - 1, from_rank + direction_row)
+            if left_diagonal.status(piece_color) == OPPOSITE_COLOR:
+                target_squares.append(left_diagonal)
+        
+        if from_file < 7:
+            right_diagonal = self.get_square(from_file + 1, from_rank + direction_row)
+            if right_diagonal.status(piece_color) == OPPOSITE_COLOR:
+                target_squares.append(right_diagonal)
+        
+        # En passant
+        from SpecialMoves import get_en_passant_square
+        if ep_square := get_en_passant_square(self, from_file, from_rank, direction_row):
+            target_squares.append(ep_square)
+        
         return target_squares
 
     def fields_in_direction(self, start_square: Square, max_distance, directions):

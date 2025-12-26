@@ -28,16 +28,25 @@ class GameManager:
 
     # Hm. learning to use @singledispatch, @overload. None of these were particularly better than this on first try
     def exec_move(self, start_square: Square, end_square: Square) -> Move:
-        move = Move(start_square, end_square)
+        from SpecialMoves import create_move
+        
+        # Validate piece ownership and get legal moves
         legal_moves = self.chessboard.legal_moves_from(start_square)
-        if move.end_square not in [m.end_square for m in legal_moves]:
+        
+        # Create the appropriate move type (handles special moves like en passant)
+        move = create_move(self.chessboard, start_square, end_square)
+        
+        # Check if this specific move is legal
+        if move not in legal_moves:
             piece_name = start_square.piece.name() if start_square.piece else "empty square"
             legal_destinations = ", ".join(str(m.end_square) for m in legal_moves) if legal_moves else "none"
             raise ValueError(
                 f"Illegal move: {piece_name} on {start_square} cannot move to {end_square}. "
                 f"Legal moves: {legal_destinations}"
             )
+        
         move.execute()
+        self.chessboard.last_move = move
         self.moves.append(move)
         self.switch_turn()
         return move
@@ -46,6 +55,8 @@ class GameManager:
         if self.moves:
             last_move = self.moves.pop()
             last_move.undo()
+            # Update last_move on board
+            self.chessboard.last_move = self.moves[-1] if self.moves else None
             self.switch_turn()
             return last_move
         return None
