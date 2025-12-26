@@ -1,3 +1,8 @@
+"""Game flow management for chess games.
+
+Handles turn management, move execution with validation,
+move history, and takeback functionality.
+"""
 from ChessBoard import ChessBoard, Move, Square
 from ChessPiece import WHITE, BLACK
 from typing import Optional

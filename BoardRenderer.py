@@ -1,3 +1,11 @@
+"""Chess board rendering using pygame.
+
+Handles visual display of the chess board including:
+- Board square colors and checkerboard pattern
+- Piece image loading and scaling
+- Move highlighting
+- Coordinate conversion between chess notation and screen pixels
+"""
 import pygame as pg
 import os
 from typing import Dict, List, Tuple

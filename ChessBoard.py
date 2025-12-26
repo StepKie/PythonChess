@@ -1,3 +1,11 @@
+"""Chess board representation and game logic.
+
+This module contains the core chess engine including:
+- Square and Move classes for representing board positions and moves
+- ChessBoard class for managing game state and move generation
+- Legal move calculation with check/checkmate/stalemate detection
+- FEN position parsing for board setup
+"""
 from typing import List
 
 from ChessPiece import *
@@ -49,6 +57,9 @@ class Square:
         if not isinstance(other, Square):
             return False
         return self.file == other.file and self.rank == other.rank
+    
+    def __hash__(self) -> int:
+        return hash((self.file, self.rank))
 
     def status(self, color: Color):
         if self.piece is None:
@@ -94,6 +105,10 @@ class Move:
 
     def __repr__(self) -> str:
         return repr(self.start_square) + repr(self.end_square)
+    
+    def __str__(self) -> str:
+        """Return move in algebraic notation (e.g., 'e2e4')."""
+        return str(self.start_square) + str(self.end_square)
 
     def affected_castling_rights(self):
         affected_rights = {
@@ -217,8 +232,8 @@ class ChessBoard:
         from_rank = from_square.rank
         piece_color = from_square.piece.color
 
-        direction_row = (-1, 1)[piece_color == BLACK]
-        starting_row = (WHITE_PAWN_START_RANK, BLACK_PAWN_START_RANK)[piece_color == BLACK]
+        direction_row = 1 if piece_color == BLACK else -1
+        starting_row = BLACK_PAWN_START_RANK if piece_color == BLACK else WHITE_PAWN_START_RANK
         one_square_forward = self.get_square(from_file, from_rank + direction_row)
         two_squares_forward = self.get_square(from_file, from_rank + 2 * direction_row)
         left_diagonal = self.get_square(from_file - 1, from_rank + direction_row)

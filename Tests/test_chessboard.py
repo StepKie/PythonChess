@@ -64,3 +64,17 @@ def test_takeback(chessboard, game_manager):
     last_move = game_manager.take_back()
     assert last_move is not None, "Should have returned a move"
     assert not chessboard.is_check(), "Should not be in check after takeback"
+
+
+def test_stalemate(chessboard):
+    """Stalemate detection works correctly"""
+    # Set up stalemate position: White Kf6, Rg7, Black Kh8, black to move
+    from ChessBoard import create_position, BLACK
+    
+    # FEN: 7k (black king on h8) / 6R1 (white rook on g7) / 5K2 (white king on f6)
+    chessboard.squares = create_position("7k/6R1/5K2/8/8/8/8/8 w - - 0 1")
+    chessboard.current_player = BLACK  # Black to move
+    
+    assert not chessboard.is_check(), "Should not be in check"
+    assert chessboard.is_stalemate(), "Should be stalemate"
+    assert chessboard.is_game_over(), "Should be game over"
