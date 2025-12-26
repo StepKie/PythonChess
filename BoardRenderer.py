@@ -10,12 +10,14 @@ import pygame as pg
 import os
 from typing import Dict, List, Tuple
 
-WHITE = pg.Color("white")
-BLACK = pg.Color("grey")
-GREEN = pg.Color("darkgreen")
+# Color scheme
+COLOR_LIGHT_SQUARE = pg.Color("white")
+COLOR_DARK_SQUARE = pg.Color("grey")
+COLOR_HIGHLIGHT = pg.Color("darkgreen")
 
+# Board dimensions
 DEFAULT_FIELD_DIMENSION = 100
-CHECKERBOARD_PATTERN = 2
+BOARD_SIZE = 8
 
 PIECE_SYMBOL_TO_FILENAME = [('r', 'br'), ('n', 'bn'), ('b', 'bb'), ('q', 'bq'), ('k', 'bk'), ('p', 'bp'),
                             ('R', 'wr'), ('N', 'wn'), ('B', 'wb'), ('Q', 'wq'), ('K', 'wk'), ('P', 'wp')]
@@ -31,15 +33,15 @@ class BoardRenderer:
     def __init__(self, chessboard, field_dimension: int = DEFAULT_FIELD_DIMENSION):
         self.chessboard = chessboard
         self.field_dimension = field_dimension
-        board_dimension = field_dimension * 8
+        board_dimension = field_dimension * BOARD_SIZE
         self.screen = pg.display.set_mode((board_dimension, board_dimension))
         self.images = self.load_images()
 
     def draw_board(self, highlighted_moves: List = []) -> None:
         for square in self.chessboard.squares:
-            color = BLACK if (square.file + square.rank) % CHECKERBOARD_PATTERN else WHITE
+            color = COLOR_DARK_SQUARE if (square.file + square.rank) % 2 else COLOR_LIGHT_SQUARE
             if square in [move.end_square for move in highlighted_moves]:
-                color = GREEN
+                color = COLOR_HIGHLIGHT
             coordinate_x, coordinate_y = self.field_to_coordinates(square.file, square.rank)
             pg.draw.rect(self.screen, color, [coordinate_x, coordinate_y, self.field_dimension, self.field_dimension])
             if square.piece is not None:

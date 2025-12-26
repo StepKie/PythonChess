@@ -78,3 +78,58 @@ def test_stalemate(chessboard):
     assert not chessboard.is_check(), "Should not be in check"
     assert chessboard.is_stalemate(), "Should be stalemate"
     assert chessboard.is_game_over(), "Should be game over"
+
+
+def test_fen_export(chessboard):
+    """FEN export works correctly"""
+    fen = chessboard.to_fen()
+    assert fen.startswith("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR")
+    
+    # Test after a move
+    game_manager = GameManager(chessboard)
+    game_manager.make_move("e2", "e4")
+    fen_after_move = chessboard.to_fen()
+    assert "w" not in fen_after_move.split()[1]  # Should be black's turn
+
+
+def test_square_validation(chessboard):
+    """Square notation validation works correctly"""
+    # Valid squares
+    assert chessboard.square("e4") is not None
+    assert chessboard.square("a1") is not None
+    assert chessboard.square("h8") is not None
+    
+    # Invalid squares
+    with pytest.raises(ValueError, match="Invalid file"):
+        chessboard.square("i4")
+    
+    with pytest.raises(ValueError, match="Invalid rank"):
+        chessboard.square("e9")
+    
+    with pytest.raises(ValueError, match="must be exactly 2 characters"):
+        chessboard.square("e")
+
+
+def test_insufficient_material(chessboard):
+    """Insufficient material detection works correctly"""
+    from ChessBoard import create_position, WHITE
+    
+    # King vs King
+    chessboard.squares = create_position("8/8/8/4k3/8/4K3/8/8 w - - 0 1")
+    assert chessboard.has_insufficient_material()
+    
+    # King and Knight vs King
+    chessboard.squares = create_position("8/8/8/4k3/8/4KN2/8/8 w - - 0 1")
+    assert chessboard.has_insufficient_material()
+    
+    # King and Bishop vs King
+    chessboard.squares = create_position("8/8/8/4k3/8/4KB2/8/8 w - - 0 1")
+    assert chessboard.has_insufficient_material()
+    
+    # King and Rook vs King (sufficient material)
+    chessboard.squares = create_position("8/8/8/4k3/8/4KR2/8/8 w - - 0 1")
+    assert not chessboard.has_insufficient_material()
+    
+    # King and two Knights vs King (sufficient material for mate, though difficult)
+    chessboard.squares = create_position("8/8/8/4k3/8/4KNN1/8/8 w - - 0 1")
+    assert not chessboard.has_insufficient_material()

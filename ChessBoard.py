@@ -109,6 +109,17 @@ class Move:
     def __str__(self) -> str:
         """Return move in algebraic notation (e.g., 'e2e4')."""
         return str(self.start_square) + str(self.end_square)
+    
+    def __eq__(self, other) -> bool:
+        """Compare moves based on start and end squares."""
+        if not isinstance(other, Move):
+            return False
+        return (self.start_square == other.start_square and 
+                self.end_square == other.end_square)
+    
+    def __hash__(self) -> int:
+        """Hash based on start and end squares."""
+        return hash((self.start_square, self.end_square))
 
     def affected_castling_rights(self):
         affected_rights = {
@@ -123,7 +134,15 @@ class Move:
         return affected_rights.get((self.piece, self.piece.color, str(self.start_square)), "")
 
 
-def create_position(fen: str):
+def parse_fen_position(fen: str) -> List[Square]:
+    """Parse FEN position string into list of squares.
+    
+    Args:
+        fen: FEN string (only position part is used)
+        
+    Returns:
+        List of 64 Square objects representing the board
+    """
     fen_parts = fen.split("/")[:8]  # Split and truncate before the first space
     squares = []
     for rank_index, fen_rank in enumerate(fen_parts):
@@ -140,6 +159,11 @@ def create_position(fen: str):
     return squares
 
 
+def create_position(fen: str):
+    """Create position from FEN string (deprecated, use parse_fen_position)."""
+    return parse_fen_position(fen)
+
+
 class ChessBoard:
     """Represents a chess board with pieces and game state.
     
@@ -150,6 +174,16 @@ class ChessBoard:
         self.squares = create_position(FEN_INITIAL_POSITION)
         self.current_player = WHITE
         self.moves = []
+    
+    @property
+    def opponent_color(self) -> Color:
+        """Get the opponent's color."""
+        return BLACK if self.current_player == WHITE else WHITE
+    
+    def copy(self):
+        """Create a deep copy of the board."""
+        import copy
+        return copy.deepcopy(self)
 
     def get_square(self, file: int, rank: int):
         return self.squares[rank * 8 + file]
@@ -159,13 +193,30 @@ class ChessBoard:
         return 0 <= file <= 7 and 0 <= rank <= 7
 
     def square(self, notation: str):
-        return self.get_square(FILE_NAMES.index(notation[0]), RANK_NAMES.index(notation[1]))
+        """Get square from algebraic notation (e.g., 'e4').
+        
+        Raises:
+            ValueError: If notation is invalid or out of bounds
+        """
+        if len(notation) != 2:
+            raise ValueError(f"Invalid notation '{notation}': must be exactly 2 characters (e.g., 'e4')")
+        
+        file_char, rank_char = notation[0], notation[1]
+        
+        if file_char not in FILE_NAMES:
+            raise ValueError(f"Invalid file '{file_char}': must be a-h")
+        if rank_char not in RANK_NAMES:
+            raise ValueError(f"Invalid rank '{rank_char}': must be 1-8")
+        
+        return self.get_square(FILE_NAMES.index(file_char), RANK_NAMES.index(rank_char))
 
     def get_attacked_squares(self) -> List[Square]:
         """Get all squares attacked by the opponent's pieces."""
-        return [attacked_square for opp_occupied_square in
-                filter(lambda sq: sq.status(self.current_player) == OPPOSITE_COLOR, self.squares)
-                for attacked_square in self.all_target_squares(opp_occupied_square)]
+        attacked = []
+        for square in self.squares:
+            if square.status(self.current_player) == OPPOSITE_COLOR:
+                attacked.extend(self.all_target_squares(square))
+        return attacked
 
     def is_check(self):
         """Check if the current player's king is under attack."""
@@ -186,6 +237,65 @@ class ChessBoard:
     def is_game_over(self):
         """Check if the game is over (checkmate or stalemate)."""
         return not self.legal_moves()
+    
+    def to_fen(self) -> str:
+        """Export current board position to FEN notation.
+        
+        Returns basic position part only (doesn't include move counters or castling rights yet).
+        """
+        fen_parts = []
+        for rank in range(8):
+            empty_count = 0
+            rank_str = ""
+            for file in range(8):
+                square = self.get_square(file, rank)
+                if square.piece is None:
+                    empty_count += 1
+                else:
+                    if empty_count > 0:
+                        rank_str += str(empty_count)
+                        empty_count = 0
+                    rank_str += square.piece.symbol()
+            if empty_count > 0:
+                rank_str += str(empty_count)
+            fen_parts.append(rank_str)
+        
+        position = "/".join(fen_parts)
+        active_color = "w" if self.current_player else "b"
+        return f"{position} {active_color} - - 0 1"
+    
+    def has_insufficient_material(self) -> bool:
+        """Check if the position has insufficient material for checkmate.
+        
+        Returns True for:
+        - King vs King
+        - King and Bishop vs King
+        - King and Knight vs King
+        - King and Bishop vs King and Bishop (same color bishops)
+        """
+        pieces = [sq.piece for sq in self.squares if sq.piece is not None]
+        
+        # Count pieces by type and color
+        white_pieces = [p for p in pieces if p.color == WHITE]
+        black_pieces = [p for p in pieces if p.color == BLACK]
+        
+        # King vs King
+        if len(pieces) == 2:
+            return True
+        
+        # King and minor piece vs King
+        if len(pieces) == 3:
+            minor_pieces = [p for p in pieces if p.piece_type in (KNIGHT, BISHOP)]
+            return len(minor_pieces) == 1
+        
+        # King and Bishop vs King and Bishop (same color squares)
+        if len(pieces) == 4:
+            bishops = [sq for sq in self.squares if sq.piece and sq.piece.piece_type == BISHOP]
+            if len(bishops) == 2:
+                # Bishops on same color squares (sum of coordinates is even or odd)
+                return (bishops[0].file + bishops[0].rank) % 2 == (bishops[1].file + bishops[1].rank) % 2
+        
+        return False
 
     def legal_moves_from(self, from_square):
         """Get all legal moves from a given square."""
