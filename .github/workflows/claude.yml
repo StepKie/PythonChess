@@ -61,6 +61,15 @@ jobs:
             - Test coverage
             - Type hint correctness
 
+            Also flag these convention violations:
+            - PR / issue / ticket-number references in source code (test names, assertion messages, comments) — those belong in commit messages and PR descriptions, not in code.
+            - Multi-line inline `#` comment blocks. We cap inline comments at one line; the "why" belongs in the commit message.
+            - Explanatory clauses or policy disclaimers in log / exception / error messages — keep them bare-fact.
+
+            Don't flag (single-dev project; these get routinely denied):
+            - Speculative-defensive concerns ("what if someone later passes None", "in case this is reused elsewhere", "for robustness against unexpected inputs", "future maintainers might not realize…") unless you name a SPECIFIC reachable execution path. The tell: "X could happen at line N because Y" (real) vs "someone might" (skip).
+            - Defensive guards for conditions that cannot legitimately occur given how the code is reached. We trust internal invariants. Only flag boundary validation (user input, external APIs, network we don't own).
+
             Use inline comments for specific issues and a summary comment for overall feedback.
           claude_args: |
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
