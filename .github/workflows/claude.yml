@@ -10,7 +10,7 @@ on:
   pull_request_review:
     types: [submitted]
   pull_request:
-    types: [opened, synchronize]
+    types: [opened, reopened, synchronize]
 
 jobs:
   claude-interactive:
@@ -50,6 +50,10 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Note the time before reviewing
+        id: before
+        run: echo "at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
       - name: Run Claude Code Review
         uses: anthropics/claude-code-action@v1
         with:
@@ -71,5 +75,38 @@ jobs:
             - Defensive guards for conditions that cannot legitimately occur given how the code is reached. We trust internal invariants. Only flag boundary validation (user input, external APIs, network we don't own).
 
             Use inline comments for specific issues and a summary comment for overall feedback.
+            Do not delegate. The Agent and Task tools are disabled here, and asking for them is a
+            wasted turn. Nothing resumes you in CI, so a turn that ends "waiting for results" posts
+            nothing at all while the check still reports success. Review the diff yourself: if it is
+            large, save it to a file and grep it rather than holding all of it at once.
+            Post every finding before your turn ends.
+
+            If a re-review finds nothing worth saying, post one short comment saying so — a review
+            that posts nothing is indistinguishable from one that never ran, and is treated as a
+            failure.
           claude_args: |
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
+            --disallowedTools "AskUserQuestion,Task,Agent"
+
+      # A review that posts nothing must not report success. The agent has ended its turn waiting on
+      # background work it launched, leaving a green check on an unreviewed pull request — which is
+      # worse than a red one, because nobody goes looking.
+      - name: Fail if the review posted nothing
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          SINCE: ${{ steps.before.outputs.at }}
+        run: |
+          posted=$(
+            {
+              gh api --paginate "repos/$REPO/issues/$PR/comments" --jq ".[] | select(.created_at > \"$SINCE\") | .id"
+              gh api --paginate "repos/$REPO/pulls/$PR/comments" --jq ".[] | select(.created_at > \"$SINCE\") | .id"
+              gh api --paginate "repos/$REPO/pulls/$PR/reviews" --jq ".[] | select(.submitted_at > \"$SINCE\") | .id"
+            } | wc -l
+          )
+          echo "Posted during this run: $posted"
+          if [ "$posted" -eq 0 ]; then
+            echo "::error::The review ran to completion and posted nothing. Check whether the agent ended its turn waiting on delegated work."
+            exit 1
+          fi
